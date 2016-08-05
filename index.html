@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html lang="en">
+	<head>
+		<title>Marco Polo!</title>
+		<!--
+		Attribution
+		eleVR webvr boilerplate: https://github.com/hawksley
+		Scanned sculptures "Unscannables": Emily Eifler
+		-->
+	</head>
+
+	<body>
+	</body>
+
+
+	<script src="js/three.min.js"></script>
+	<script src="js/VRControls.js"></script>
+	<script src="js/VREffect.js"></script>
+	<script src="lib/gl-matrix.js"></script>
+	<script src="js/VRCursor.js"></script>
+	<script src="loaders/OBJloader.js"></script>
+	<script src="loaders/MTLLoader.js"></script>
+	<script src="loaders/OBJMTLLoader.js"></script>
+	<!-- // <script src="lib/tween.js"></script> -->
+	<script src="js/PhoneVR.js"></script>
+
+	<script>
+		var debug = false;
+
+		var c = 1/15; //scae factor
+		/*
+		Setup three.js WebGL renderer
+		*/
+		var renderer = new THREE.WebGLRenderer( { antialias: true } );
+		/*
+		Append the canvas element created by the renderer to document body element.
+		*/
+		document.body.appendChild( renderer.domElement );
+		/*
+		Create a three.js scene
+		*/
+		var scene = new THREE.Scene();
+		/*
+		Create a three.js camera
+		*/
+		var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.001, 10000 );
+
+		/*
+		Apply VR headset positional data to camera.
+		*/
+		var controls = new THREE.VRControls( camera, undefined, 4 );
+
+		/*
+		Apply VR stereo rendering to renderer
+		*/
+		var effect = new THREE.VREffect( renderer );
+		effect.setSize( window.innerWidth, window.innerHeight );
+
+		/*
+		Light
+		*/
+		var light = new THREE.AmbientLight( 0x404040 );
+		scene.add( light );
+
+		var directionalLight = new THREE.DirectionalLight( 0x404040, 5 );
+		directionalLight.position.set( 0, 2, 0 );
+		scene.add( directionalLight );
+
+		var light2 = new THREE.PointLight( 0xffffff, 1, 100 );
+		light2.intensity = 1;
+		scene.add( light2 );
+
+		var hands = {};
+
+		controls.setDefaultPosition([0,1.5,-1]);
+
+		/*
+		Request animation frame loop function
+		*/
+		var t = 1;
+		var tb = 1;
+		var prevSelected = null;
+
+		var vrModeGamePadButtonPressed = false; // because of annoying way gamepad buttons work
+		var pressedController = -1;
+
+		var manualPosition = new THREE.Vector3(0,0,0);
+
+		function handTimer(hand) {
+			timeoutID = setTimeout(function(){ hands[hand].visible = false; }, 1000);
+		}
+
+		function animate() {
+			if(debug) {
+				console.timeEnd("everything");
+				console.time("animate");
+			}
+
+			/*
+			Update VR headset position and apply to camera.
+			*/
+			controls.update();
+
+			// HANDS!!!!
+			for (j in controls.controllers) {
+				if(debug) {
+					console.time("controls");
+				}
+
+
+				var handControl = controls.controllers[j]
+				if (!hands[j]) {
+					//create a new hands[j] for each controller
+					hands[j] = new THREE.Mesh(new THREE.OctahedronGeometry(.05), new THREE.MeshNormalMaterial());
+					hands[j].visible = false;
+					scene.add(hands[j]);
+				}
+				if(handControl.pose){
+					hands[j].position.set(handControl.pose.position[0], handControl.pose.position[1], handControl.pose.position[2]);
+				}
+
+				if (handControl.pose && handControl.buttons[3].pressed) { // enter VR mode
+					pressedController = j;
+					vrModeGamePadButtonPressed = true;
+				} else if (vrModeGamePadButtonPressed && pressedController === j) {
+					vrModeGamePadButtonPressed = false;
+					pressedController = -1;
+					vrMode = !vrMode;
+					effect.setVRMode(vrMode);
+				}
+
+		        if (handControl.pose && handControl.buttons[1].pressed) { // make controller temporarily visible
+		        	hands[j].visible = true;
+		        	handTimer(j);
+		        }
+
+				if(debug) {
+					console.timeEnd("controls");
+					console.log(handControl.pose.position);
+				}
+			}
+
+			/*
+			Render the scene through the VREffect.
+			*/
+			// scene.simulate();
+			effect.render( scene, camera );
+			requestAnimationFrame( animate );
+			if(debug) {
+				console.time("everything");
+				console.timeEnd("animate");
+			}
+		}
+
+		/*
+		Kick off animation loop
+		*/
+		animate();
+
+
+
+		/*
+		Listen for double click event to enter full-screen VR mode
+		*/
+		document.body.addEventListener( 'dblclick', function() {
+			effect.setFullScreen( true );
+		});
+
+		/*
+		Listen for keyboard event and zero positional sensor on appropriate keypress.
+		*/
+		var vrMode = false;
+		function onkey(event) {
+	    event.preventDefault();
+             if (event.keyCode == 90) { // z
+	    	controls.zeroSensor(); //zero rotation
+	    } else if (event.keyCode == 70) { //f
+	    	effect.setFullScreen(true) //fullscreen
+		  } else if (event.keyCode == 73) { //i
+		    manualPosition.x += 0.01; //
+		    everything.position.x += 0.01; //
+		  } else if (event.keyCode == 75) { //k
+		    manualPosition.x -= 0.01; //
+		    everything.position.x -= 0.01; //
+		  } else if (event.keyCode == 74) { //j
+		    manualPosition.z += 0.01; //
+		    everything.position.z += 0.01; //
+		  } else if (event.keyCode == 76) { //l
+		    manualPosition.z -= 0.01; //
+		    everything.position.z -= 0.01; //
+		  } else if (event.keyCode == 85) { //u
+		    manualPosition.y += 0.01; //
+		    everything.position.y += 0.01; //
+		  } else if (event.keyCode == 79) { //o
+		    manualPosition.y -= 0.01; //
+		    everything.position.y -= 0.01; //
+	  	} else if (event.keyCode == 86 || event.keyCode == 13 || event.keyCode == 32 ) { // v or 'enter' or 'space' for VR mode
+		    vrMode = !vrMode;
+		    effect.setVRMode(vrMode);
+			}
+
+	  };
+
+	  window.addEventListener("keydown", onkey, true);
+
+
+		/*
+		Handle window resizes
+		*/
+		function onWindowResize() {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			effect.setSize( window.innerWidth, window.innerHeight );
+		}
+
+		window.addEventListener( 'resize', onWindowResize, false );
+
+		document.body.addEventListener( 'click', doClickStuff);
+
+		function doClickStuff(event) {
+		  effect.setFullScreen(true);
+
+		  if (typeof window.screen.orientation !== 'undefined' && typeof window.screen.orientation.lock === 'function') {
+		    window.screen.orientation.lock('landscape-primary');
+		  }
+
+		  if (typeof window.screen.webkitLockOrientation !== 'undefined' && typeof window.screen.webkitLockOrientation.lock === 'function') {
+		    window.screen.webkitLockOrientation('landscape-primary');
+		  }
+		}
+
+	</script>
+</html>
